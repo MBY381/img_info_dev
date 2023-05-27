@@ -69,9 +69,9 @@ def top_coroutine(top_raw):
 
 
 def left_coroutine(left_raw):
-    print("left_raw")
-    print(left_raw.shape)
-    cv2.imshow("ewqe", left_raw)
+    # print("left_raw")
+    # print(left_raw.shape)
+    # cv2.imshow("ewqe", left_raw)
     left_resized = cv2.resize(left_raw, (640, 360), interpolation=cv2.INTER_AREA)
     left_undistorted = cv2.undistort(left_resized, MTX_CAMERA2, DIST_CAMERA2, None, None)
     left_resized1 = cv2.resize(left_undistorted, (1280, 720), interpolation=cv2.INTER_AREA)
@@ -194,12 +194,14 @@ def mainnn():
 
 lock = threading.Lock()
 
+cap_device000 = cv2.VideoCapture('device0.avi')
+cap_device55 = cv2.VideoCapture('device5.avi')
+
 
 # 定义一个线程函数用于执行指定的函数，并等待其他线程执行完毕
 def run_thread(func, barrier, n):
     global FRAME, img0, img5
-    global cap_device0
-    global cap_device5
+    global cap_device55
     while True:
         now = time.time()
         # 全景拼接图片帧变量
@@ -241,46 +243,45 @@ cond = threading.Condition()
 # 定义一个 Barrier，用于同步线程开始的时间
 barrier = threading.Barrier(5)
 
-ret1, img0 = cap_device0.read()
-ret2, img5 = cap_device5.read()
-height, width, _ = img0.shape
-h, w = height // 2, width // 2
-# 原生全景图
-top_raw = img5  # mby# cv2.imread()用于读取图片文件 默认加载RGB 可仅加载灰度图片
-bottom_left_raw = img0[0:h, w:2 * w]
-bottom_right_raw = img0[h:2 * h, w:2 * w]
-left_raw = img0[0:h, 0:w]
-right_raw = img0[h:2 * h, 0:w]
-imgs = [top_raw, left_raw, right_raw, bottom_left_raw, bottom_right_raw]
+imgs = [0,0,0,0,0]
+
+
+def readd():
+    ret1, img0 = cap_device000.read()
+    ret2, img5 = cap_device55.read()
+    height, width, _ = img0.shape
+    h, w = height // 2, width // 2
+    # 原生全景图
+    top_raw = img5  # mby# cv2.imread()用于读取图片文件 默认加载RGB 可仅加载灰度图片
+    bottom_left_raw = img0[0:h, w:2 * w]
+    bottom_right_raw = img0[h:2 * h, w:2 * w]
+    left_raw = img0[0:h, 0:w]
+    right_raw = img0[h:2 * h, 0:w]
+    imgs[0] = img5
+    imgs[1] = left_raw
+    imgs[2] = right_raw
+    imgs[3] = bottom_left_raw
+    imgs[4] = bottom_right_raw
+
+
+readd()
+cv2.imshow("????/", imgs[0])
+cv2.waitKey(0)
 
 
 def run_once(func, num):
-    print("wdnmd")
+    # print("wdnmd")
     print(num)
     global cnt, imgs
     func(imgs[num])
-    print(imgs[num].shape)
+    # print(imgs[num].shape)
     with cond:
         # 增加计数器的值
         cnt += 1
         # 如果计数器达到 5，唤醒等待的线程
         if cnt == 5:
-            ret1, img01 = cap_device0.read()
-            ret2, img51 = cap_device5.read()
-            if (ret1):
-                cv2.imshow("wdnmd", img01)
-            h, w = height // 2, width // 2
-            # 原生全景图
-            top_raw1 = img5  # mby# cv2.imread()用于读取图片文件 默认加载RGB 可仅加载灰度图片
-            bottom_left_raw1 = img01[0:h, w:2 * w]
-            bottom_right_raw1= img01[h:2 * h, w:2 * w]
-            left_raw1 = img01[0:h, 0:w]
-            right_raw1 = img01[h:2 * h, 0:w]
-            imgs[0] = top_raw1
-            imgs[1] = left_raw1
-            imgs[2] = right_raw1
-            imgs[3] = bottom_left_raw1
-            imgs[4] = bottom_right_raw1
+            readd()
+            cv2.imshow("nmd", imgs[0])
             cnt = 0
             cv2.imshow("ds", FRAME)
     barrier.wait()
@@ -669,9 +670,23 @@ def threads_run_stitch():
 
 
 if __name__ == '__main__':
+    while True:
+        readd()
+        cv2.imshow("nmd", imgs[0])
+    # cap_device000 = cv2.VideoCapture('device0.avi')
+    #
+    #
+    # while True:
+    #     ret2, shitt = cap_device000.read()
+    #     cv2.imshow("eqweq", shitt)
+    #
+    #     if cv2.waitKey(25) & 0xFF == ord('q'):
+    #         break
+    #
+    # cv2.destroyAllWindows()
 
     # run_threads()
-    app = QApplication(sys.argv)
-    display = VideoDisplay()
-    display.show()
-    sys.exit(app.exec_())
+    # app = QApplication(sys.argv)
+    # display = VideoDisplay()
+    # display.show()
+    # sys.exit(app.exec_())

@@ -1,7 +1,9 @@
+import os
+
 import sys
 import cv2
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QImage, QPixmap, QColor, QPainter, QPen, QIcon
+from PyQt5.QtGui import QImage, QPixmap, QColor, QPainter, QPen, QIcon, QPalette
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QApplication, QFrame, QHBoxLayout
 
 import json
@@ -308,12 +310,34 @@ class VideoDisplay(QWidget):
         self.paused_text = self.paused_texts[0]
         self.button1 = QPushButton(self.paused_text, self)
         self.button1.clicked.connect(self.pause_image)  # 连接按钮的点击事件到 show_image 槽函数上
-        font = QFont('Microsoft YaHei', 12)  # 创建一个字体对象
-        self.button1.setFont(font)  # 将字体应用于按钮
+        button_font = QFont('Microsoft YaHei', 10)  # 创建一个字体对象
+        self.button1.setFont(button_font)  # 将字体应用于按钮
         self.button1.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
         self.right_layout.addWidget(self.button1)
-        # 创建 QLabel 组件来显示五个布尔变量的状态
 
+        self.button2 = QPushButton("录制视频", self)
+        self.button2.clicked.connect(self.write_video_status)  # 连接按钮的点击事件到 show_image 槽函数上
+        self.button2.setFont(button_font)  # 将字体应用于按钮
+        self.button2.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
+        self.button2.setStyleSheet("border: 1px solid black;")
+        # 创建 QLabel 组件来显示五个布尔变量的状态
+        palette = QPalette()
+        palette.setColor(QPalette.Button, QColor(255, 128, 128))
+        self.button2.setPalette(palette)
+
+        # # 绑定 signaled by the button's "hovered" signal
+        # self.button2.hovered.connect(lambda: self.button2.setStyleSheet("background-color: darkgray;"))
+
+        self.button3 = QPushButton("显示录像", self)
+        self.button3.clicked.connect(self.show_video)  # 连接按钮的点击事件到 show_image 槽函数上
+        self.button3.setFont(button_font)  # 将字体应用于按钮
+        self.button3.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
+        self.button3.hide()  # 隐藏 button3
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.button2)
+        hbox.addStretch(1)  # 添加伸缩空间
+        hbox.addWidget(self.button3)
+        self.right_layout.addLayout(hbox)
         self.h_layout.addLayout(self.right_layout)
 
         # 设置 QFont 来使得字体更加清晰易读
@@ -353,6 +377,8 @@ class VideoDisplay(QWidget):
         h, w, ch = FRAME.shape
         qimg = QImage(FRAME, w, h, ch * w, QImage.Format_RGB888)
 
+        if self.video_writing:
+            self.write_video()
         # 调整 QLabel 和 QPixmap 大小以匹配视频流尺寸
 
         self.video_label.setPixmap(QPixmap(qimg).scaled(VIDEO_WIDTH, VIDEO_HEIGHT))
@@ -367,11 +393,58 @@ class VideoDisplay(QWidget):
             clicked = True
         else:
             self.paused = False
-            print("clicked")
+            print("别点了o不ok")
+
+    video_writing = False
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    output_path = './video/'
+    current_video_name = "output.avi"
+    # 帧率
+    fps = 10
+    # 获取图像尺寸信息
+    height, width, _ = FRAME.shape
+    out = cv2.VideoWriter(output_path + current_video_name, fourcc, fps, (width, height))
+
+    def write_video_status(self):
+        # self.video_writing = not self.video_writing
+        self.video_writing = not self.video_writing
+        if self.video_writing:
+            self.current_video_name = "output" + str(int(round(time.time() * 1000)))[-6:] + ".avi"
+            print("开始录制视频，当前视频文件名：")
+            print(self.current_video_name)
+            self.out = cv2.VideoWriter(self.output_path + self.current_video_name, self.fourcc, self.fps,
+                                       (self.width, self.height))
+        self.button2.setText('正在录制' if self.video_writing else '开始录制')
+        if not self.video_writing:
+            self.button3.show()
+
+
+    def write_video(self):
+        frame = cv2.cvtColor(FRAME, cv2.COLOR_BGR2RGB)
+        self.out.write(frame)
+
+    def show_video(self):
+        print("显示视频：")
+        print(self.current_video_name)
+        capppp = cv2.VideoCapture(self.output_path + self.current_video_name)
+        self.pause_image()
+        while True:
+            ret, frame = capppp.read()
+            if not ret:
+                break
+            cv2.imshow('frame', frame)
+            print("显示了录像的一帧")
+            if cv2.waitKey(25) & 0xFF == ord('q'):
+                break
+            time.sleep(0.08)
+
+        capppp.release()
+        self.pause_image()
+        cv2.destroyAllWindows()
 
     def pause_image(self):
         self.paused = not self.paused
-        self.button1.setText('继续播放' if self.paused else '暂停')
+        self.button1.setText('继续播放▷' if self.paused else '暂停播放‖')
 
     def set_status(self):
         # 设置布尔变量的状态
