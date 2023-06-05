@@ -1,14 +1,17 @@
-import os
-
+import subprocess
 import sys
-import cv2
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QImage, QPixmap, QColor, QPainter, QPen, QIcon, QPalette
-from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QApplication, QFrame, QHBoxLayout
+import threading
+from datetime import datetime
 
-import json
+from PyQt5 import QtCore
+
+from system.src.sys.src_back import system
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QImage, QPixmap, QIcon
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QApplication, QFrame, QHBoxLayout, QDialog, \
+    QToolButton
+
 import time
-import re
 
 # 导入python-opencv和numpy模块
 import cv2
@@ -32,18 +35,22 @@ VIDEOSRC = 0
 TOTAL_SIZE_BLOCKS = [20, 28]
 FULL_RESOLUTION = (TOTAL_SIZE_BLOCKS[0] * BLOCK_SIZE, TOTAL_SIZE_BLOCKS[1] * BLOCK_SIZE)
 FRAME = np.zeros([FULL_RESOLUTION[1], FULL_RESOLUTION[0], 3], np.uint8)
-car = cv2.imread("./imgs/car.png")
+car = cv2.imread("./imgs/carr.png")
 carr = cv2.cvtColor(car, cv2.COLOR_BGR2RGB)
-print("car")
-print(car.shape)
-carr = cv2.resize(carr, (250, 425), interpolation=cv2.INTER_AREA)
-FRAME[150:575, 125:375] = carr[0:425, 0:250]
+carr = cv2.resize(carr, (250, 450), interpolation=cv2.INTER_AREA)
+FRAME[150:600, 125:375] = carr[0:450, 0:250]
+gray = cv2.cvtColor(FRAME[150:600, 125:375], cv2.COLOR_RGB2GRAY)
+print("\n\n----------------------------------------------------------------------------------------------------")
+print("全景拼接播放系统 version 2.2.7")
+print("----------------------------------------------------------------------------------------------------\n\n\n\n")
+# Update the FRAME with the gray version of the specified region
+FRAME[150:600, 125:375] = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 #  定义分块大小
 TOP_BLOCKS = [20, 6]
-LEFT_BLOCKS = [5, 17]
-RIGHT_BLOCKS = [5, 17]
-BOTTOM_LEFT_BLOCKS = [10, 5]
-BOTTOM_RIGHT_BLOCKS = [10, 5]
+LEFT_BLOCKS = [5, 18]
+RIGHT_BLOCKS = [5, 18]
+BOTTOM_LEFT_BLOCKS = [10, 4]
+BOTTOM_RIGHT_BLOCKS = [10, 4]
 TOTAL_SIZE_BLOCKS = [20, 28]
 
 FULL_RESOLUTION = (TOTAL_SIZE_BLOCKS[0] * BLOCK_SIZE, TOTAL_SIZE_BLOCKS[1] * BLOCK_SIZE)
@@ -68,12 +75,14 @@ def stitch_process():
     # img_device0 = cv2.imread("./chessboard_images/img_device0_around.jpg")
     # img_device5 = cv2.imread("./chessboard_images/img_device5_head.jpg")
     ret1, img_device0 = cap_device0.read()
-    print("read")
-    print(ret1)
+    # print("read")
+    # print(ret1)
     if not ret1:
         # 如果读取到了最后一帧，则重置文件指针到开头再次循环播放
         cap_device0 = cv2.VideoCapture('device0.avi')
         ret, img_device0 = cap_device0.read()
+        if not ret:
+            CAMERA_STATUS[0:3] = False
         # print("wdnmd")
         # print(img_device0.shape)
         # cv2.imshow("wdnmd",img_device0)
@@ -83,7 +92,9 @@ def stitch_process():
     if not ret2:
         # 如果读取到了最后一帧，则重置文件指针到开头再次循环播放
         cap_device5 = cv2.VideoCapture('device5.avi')
-        ret2, img_device5 = cap_device5.read()
+        ret, img_device5 = cap_device5.read()
+        if not ret:
+            CAMERA_STATUS[4] = False
     height, width, _ = img_device0.shape
     h, w = height // 2, width // 2
     # 原生全景图
@@ -110,7 +121,7 @@ def stitch_process():
     right_undistorted = cv2.undistort(right_resized, MTX_CAMERA2, DIST_CAMERA2, None, None)
     bottom_left_undistorted = cv2.undistort(bottom_left_resized, MTX_CAMERA2, DIST_CAMERA2, None, None)
     bottom_right_undistorted = cv2.undistort(bottom_right_resized, MTX_CAMERA1, DIST_CAMERA1, None, None)
-    print("预处理所花费的时间" + str(time.time() - now))
+    print("预处理摄像头数据所花费的时间" + str(time.time() - now))
 
     # cv2.imshow("mine", bottom_right_undistorted)
     # cv2.imshow("weqw1", bottom_left_undistorted)
@@ -222,7 +233,7 @@ def stitch_process():
 
     # cv2.imwrite("pinjie.jpg", expand)
     noww = str(time.time() - now)
-    print("处理一帧所花费的时间" + noww)
+    print("处理一帧所花费的时间" + noww + "\n")
     # cv2.waitKey(10)  # mby# waitKey()–是在一个给定的时间内(单位ms)等待用户按键触发; 如果用户没有按下键,则继续等待 (循环)
 
 
@@ -256,39 +267,207 @@ clicked = False
 class VideoDisplay(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("全景拼接播放系统 v2.2.7")
+        self.setWindowTitle("·   全景拼接播放系统 v2.2.7")
         widget_icon = QIcon('./imgs/icons8-web-camera-48.png')
         self.setWindowIcon(widget_icon)
         # 创建 QLabel 并初始化宽度和高度
         self.h_layout = QHBoxLayout()
         self.left_layout = QVBoxLayout()
-
-        self.left_layout.setSpacing(0)  # 设置标签之间的间距
-        self.button = QPushButton('显示全景视频', self)
+        self.left_layout.addStretch(2)
+        self.left_layout.setSpacing(2)  # 设置标签之间的间距
+        self.button = QPushButton('开始播放', self)
+        font = QFont('MicroSoft YaHei Light', 12)
+        font.setBold(True)
+        self.button.setFixedSize(200, 40)
+        self.button.setFont(font)
         self.button.clicked.connect(self.show_image)  # 连接按钮的点击事件到 show_image 槽函数上
         self.left_layout.addWidget(self.button)
 
-        font = QFont('Microsoft YaHei', 12)  # 创建一个字体对象
-        self.button.setFont(font)  # 将字体应用于按钮
-        self.button.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
+        # self.button = MyButton()
+        # # font = QFont('MicroSoft YaHei', 14)
+        # # font.setBold(True)
+        # # self.button.setFont(font)
+        # # self.button.setFixedSize(200, 40)
+        #
+        # self.left_layout.addWidget(self.button)
+        # # 设置样式
+        # # self.button.setFlat(True)
+
+        self.left_layout.addStretch(2)
+        # self.layout.addWidget(self.button)
+        button_font = QFont('Microsoft YaHei UI', 10)  # 创建一个字体对象
+        left_button_box1 = QHBoxLayout()
+
+        self.left_layout.addStretch(2)
+        self.button4 = QPushButton("保存当前帧")
+        self.button4.clicked.connect(self.save_image)  # 连接按钮的点击事件到 show_image 槽函数上
+        self.button4.setFont(button_font)  # 将字体应用于按钮
+        self.button4.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
+
+        self.folder_button = QToolButton()
+        self.folder_button.setAutoFillBackground(True)
+        self.folder_icon = QIcon('./imgs/icons8-folder-48.png')
+        self.folder_button.setIcon(self.folder_icon)
+        # folder_button.setText("选择文件夹")
+        # folder_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.folder_button.setFixedSize(40, 40)
+        folder = "D:\\软件工程\\毕业设计\\pythonProject\\system\\src\\sys\\imgs\\frames"
+        self.folder_button.clicked.connect(
+            lambda: self.open_folder(folder))  # replace with your desired default path
+
+        # 添加工具按钮到布局
+
+        left_button_box1.addWidget(self.button4)
+        left_button_box1.addStretch(1)
+        left_button_box1.addWidget(self.folder_button)
+        left_button_box1.addStretch(1)
+        self.left_layout.addLayout(left_button_box1)
+        self.left_layout.addStretch(2)
+
+        self.button2 = QPushButton("录制视频", self)
+        self.button2.clicked.connect(self.write_video_status)  # 连接按钮的点击事件到 show_image 槽函数上
+        self.button2.setFont(button_font)  # 将字体应用于按钮
+        self.button2.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
+        self.button2.setStyleSheet("border: 2px solid gray;")
+        left_button_box2 = QHBoxLayout()
+        left_button_box2.addWidget(self.button2)
+        left_button_box2.addStretch(1)
+        self.left_layout.addLayout(left_button_box2)
+
+        self.left_layout.addStretch(2)
+
+        self.left_button_box3 = QHBoxLayout()
+        self.button3 = QPushButton("回放录像", self)
+        self.button3.clicked.connect(self.show_video)  # 连接按钮的点击事件到 show_image 槽函数上
+        self.button3.setFont(button_font)  # 将字体应用于按钮
+        self.button3.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
+        self.button3.hide()  # 隐藏 button3
+
+        self.folder_button1 = QToolButton()
+        folder_icon = QIcon('./imgs/icons8-folder-48.png')
+        self.folder_button1.setIcon(folder_icon)
+        # folder_button.setText("选择文件夹")
+        # self.folder_button1.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        folder1 = "D:\\软件工程\\毕业设计\\pythonProject\\system\\src\\sys\\video"
+        self.folder_button1.clicked.connect(
+            lambda: self.open_folder(folder1))  # replace with your desired default path
+        self.folder_button1.setFixedSize(40, 40)
+        self.folder_button1.hide()
+        self.left_button_box3.addWidget(self.button3)
+        self.left_button_box3.addStretch(1)  # 添加伸缩空间
+        self.left_button_box3.addWidget(self.folder_button1)
+        self.left_button_box3.addStretch(1)
+        self.space_label = QLabel()
+        self.space_label.setFixedHeight(40)
+        self.left_button_box3.addWidget(self.space_label)
+        self.left_layout.addLayout(self.left_button_box3)
+
+        self.left_layout.addStretch(15)
+
+        self.status_layout = QHBoxLayout()
+        self.status_left_layout = QVBoxLayout()
+        self.status_right_layout = QVBoxLayout()
+
+        folder_icon = QIcon('./imgs/icons8-摄像头-48.png')
+        status_layout1 = QHBoxLayout()
+        button = QPushButton()
+        button.setFixedHeight(50)
+        button.setAutoFillBackground(True)
+        button.setFlat(True)
+        # button.setStyleSheet("border:none;")
+        button.setIcon(folder_icon)
+        button.clicked.connect(lambda: self.open_perspective(1))
+        status_layout1.addWidget(button)
+        self.status_right_layout.addStretch(1)
+        self.status_right_layout.addLayout(status_layout1)
+
+        status_layout1 = QHBoxLayout()
+        button = QPushButton()
+        button.setFixedHeight(50)
+        button.setAutoFillBackground(True)
+        button.setFlat(True)
+        button.setIcon(folder_icon)
+        # button.setStyleSheet("border:none;")
+        button.clicked.connect(lambda: self.open_perspective(2))
+        status_layout1.addWidget(button)
+        self.status_right_layout.addStretch(1)
+        self.status_right_layout.addLayout(status_layout1)
+
+        status_layout1 = QHBoxLayout()
+        button = QPushButton()
+        button.setFixedHeight(50)
+        button.setAutoFillBackground(True)
+        button.setFlat(True)
+        # button.setStyleSheet("border:none;")
+        button.setIcon(folder_icon)
+        button.clicked.connect(lambda: self.open_perspective(3))
+        status_layout1.addWidget(button)
+        self.status_right_layout.addStretch(1)
+        self.status_right_layout.addLayout(status_layout1)
+
+        status_layout1 = QHBoxLayout()
+        status_layout1.addStretch(1)
+        button = QPushButton()
+        button.setFixedHeight(50)
+        button.setAutoFillBackground(True)
+        button.setFlat(True)
+        # button.setStyleSheet("border:none;")
+        button.setIcon(folder_icon)
+        button.clicked.connect(lambda: self.open_perspective(4))
+        status_layout1.addWidget(button)
+        self.status_right_layout.addStretch(1)
+        self.status_right_layout.addLayout(status_layout1)
+
+        status_layout1 = QHBoxLayout()
+        button = QPushButton()
+        button.setFixedHeight(50)
+        button.setAutoFillBackground(True)
+        button.setFlat(True)
+        # button.setStyleSheet("border:none;")
+        button.setIcon(folder_icon)
+        button.clicked.connect(lambda: self.open_perspective(5))
+        status_layout1.addWidget(button)
+        self.status_right_layout.addStretch(1)
+        self.status_right_layout.addLayout(status_layout1)
+
+        self.status_layout.addLayout(self.status_right_layout)
 
         self.status_labels = [QLabel(str(i), self) for i in range(5)]
-        for status_label in self.status_labels:
+        for i, status_label in enumerate(self.status_labels):
             # 设置标签的默认文本和控件大小
             # 创建一个状态标记，并将其设置为 label 的子控件
-            # status_icon = QLabel('●', status_label)
-            # status_icon.setFixedSize(10, 10)
-            # status_icon.setStyleSheet('border-radius:-20px;')  # 将 label 右边距离为标记留出一定空间
-            # status_layout = QHBoxLayout(status_label)
-            # # status_layout.setSpacing(20)
-            # status_layout.setContentsMargins(0, 0, 20, 0)  # 设置布局边缘
-            # status_label.setStyleSheet('QLabel{margin: 20px 0px 20px 0px;}')
-            # status_layout.addWidget(status_icon)  # 将标记添加到布局中
+            status_layout1 = QHBoxLayout()
             status_label.setText('标签文本')
-            status_label.setFixedHeight(30)
+            status_label.setFixedHeight(50)
+            status_label.setFixedWidth(188)
+            # # 将 Y 坐标向上移动 34 个像素
+            # new_pos = QtCore.QPoint(current_pos.x(), current_pos.y() + 16)
+            # status_label.move(new_pos)
+            status_layout1.addWidget(status_label)
 
-            self.left_layout.addWidget(status_label)
+            # space_label = QLabel()
+            # space_label.setFixedWidth(5)
+            # status_layout1.addWidget(space_label)
+            dot_label = QLabel()
+            dot_label.setFixedSize(16, 16)  # 设置固定大小
+            dot_label.setStyleSheet(
+                f"background-color: {'green'}; border-radius: 8px;")  # 根据状态设置背景色
+            dot_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            status_layout1.addWidget(dot_label)
+            status_layout1.addStretch(10)
+            # status_layout.setContentsMargins(0, 5, 0, 5)
+            self.status_left_layout.addStretch(1)
+            self.status_left_layout.addLayout(status_layout1)
+        self.status_layout.addLayout(self.status_left_layout)
+        # self.left_layout.addLayout(self.status_layout)
+        # 设置 QFont 来使得字体更加清晰易读
+        font_status = QFont('Microsoft YaHei UI', 11)
+        for status_label in self.status_labels:
+            status_label.setFont(font_status)
 
+
+        self.left_layout.addLayout(self.status_layout)
+        self.left_layout.addStretch(30)
         self.h_layout.addLayout(self.left_layout)
 
         self.right_layout = QVBoxLayout()
@@ -296,55 +475,36 @@ class VideoDisplay(QWidget):
         self.video_label.resize(VIDEO_WIDTH, VIDEO_HEIGHT)
         self.video_label.setVisible(False)
         self.right_layout.addWidget(self.video_label)
-        # # 创建 QVBoxLayout 布局组件并将其添加到 QWidget 上
-        # self.layout = QVBoxLayout()
-        # self.layout.addWidget(self.video_label)
+
         self.place_holder = QFrame(self)
         self.place_holder.setStyleSheet("border: 2px solid #BDBDBD; background-color: #FFFFFF")
         self.place_holder.setFixedSize(VIDEO_WIDTH, VIDEO_HEIGHT)  # 设置与 video_label 相同的尺寸
+
+        self.text_label11 = QLabel("请点击左侧开始播放按钮", self)
+        font11 = QFont('MicroSoft YaHei', 12)
+        self.text_label11.setFont(font11)
+
+        # 设置标签居中对齐
+        hbox11 = QHBoxLayout()
+        hbox11.addWidget(self.text_label11, alignment=Qt.AlignCenter)
+        hbox11.setContentsMargins(0, 0, 0, 0)
+        self.place_holder.setLayout(hbox11)
         self.right_layout.addWidget(self.place_holder)
         # 创建一个 QPushButton 对象，并设置它的文本为 “显示图像”
+        self.right_layout.addStretch(5)
 
-        # self.layout.addWidget(self.button)
-        self.paused_texts = ["暂停播放", "继续播放"]
-        self.paused_text = self.paused_texts[0]
-        self.button1 = QPushButton(self.paused_text, self)
+        button_font1 = QFont("MicroSoft YaHei UI", 11)
+        button_font1.setBold(True)
+        self.right_button_box1 = QHBoxLayout()
+        self.button1 = QPushButton("暂停播放", self)
         self.button1.clicked.connect(self.pause_image)  # 连接按钮的点击事件到 show_image 槽函数上
-        button_font = QFont('Microsoft YaHei', 10)  # 创建一个字体对象
-        self.button1.setFont(button_font)  # 将字体应用于按钮
-        self.button1.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
-        self.right_layout.addWidget(self.button1)
+        self.button1.setFont(button_font1)  # 将字体应用于按钮
+        self.button1.setFixedSize(150, 55)  # 设置按钮宽度为100像素，高度为30像素
+        self.right_button_box1.addWidget(self.button1)
 
-        self.button2 = QPushButton("录制视频", self)
-        self.button2.clicked.connect(self.write_video_status)  # 连接按钮的点击事件到 show_image 槽函数上
-        self.button2.setFont(button_font)  # 将字体应用于按钮
-        self.button2.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
-        self.button2.setStyleSheet("border: 1px solid black;")
-        # 创建 QLabel 组件来显示五个布尔变量的状态
-        palette = QPalette()
-        palette.setColor(QPalette.Button, QColor(255, 128, 128))
-        self.button2.setPalette(palette)
+        self.right_layout.addLayout(self.right_button_box1)
 
-        # # 绑定 signaled by the button's "hovered" signal
-        # self.button2.hovered.connect(lambda: self.button2.setStyleSheet("background-color: darkgray;"))
-
-        self.button3 = QPushButton("显示录像", self)
-        self.button3.clicked.connect(self.show_video)  # 连接按钮的点击事件到 show_image 槽函数上
-        self.button3.setFont(button_font)  # 将字体应用于按钮
-        self.button3.setFixedSize(200, 40)  # 设置按钮宽度为100像素，高度为30像素
-        self.button3.hide()  # 隐藏 button3
-        hbox = QHBoxLayout()
-        hbox.addWidget(self.button2)
-        hbox.addStretch(1)  # 添加伸缩空间
-        hbox.addWidget(self.button3)
-        self.right_layout.addLayout(hbox)
         self.h_layout.addLayout(self.right_layout)
-
-        # 设置 QFont 来使得字体更加清晰易读
-        font = QFont('Microsoft YaHei', 12)
-        font.setPointSize(12)
-        for status_label in self.status_labels:
-            status_label.setFont(font)
 
         # 将布局组件设置到主窗口中
         self.setLayout(self.h_layout)
@@ -361,6 +521,26 @@ class VideoDisplay(QWidget):
         self.status = [False] * 5
 
     paused = False;
+
+    def play(self, i):
+        while True:
+            # 显示当前帧
+            img=FRAME
+            cv2.imshow("play", img)
+            cv2.waitKey(40)
+            # 等待键盘输入
+            # key = cv2.waitKey(40)  # 检测按键，每秒播放25帧左右。
+            # if key == ord('q') or key == ord('Q') or key == 27:  # 如果按下q或者ESC，播放结束
+            #     break
+            # cv2.destroyAllWindows()
+
+    def open_perspective(self, i):
+        # if not self.paused:
+        #     self.pause_image()
+        # print(i)
+        print("开始播放摄像机"  + "的画面")
+        t = threading.Thread(target=self.play(i))
+        t.start()
 
     def update_image(self):
 
@@ -416,20 +596,54 @@ class VideoDisplay(QWidget):
                                        (self.width, self.height))
         self.button2.setText('正在录制' if self.video_writing else '开始录制')
         if not self.video_writing:
+            window = QWidget()
+            window.setWindowTitle('全景拼接播放系统 v2.2.7')
+            window.resize(300, 200)
+            widget_icon = QIcon('./imgs/icons8-web-camera-48.png')
+            window.setWindowIcon(widget_icon)
+            # 创建一个自定义 QDialog 对象并执行该对话框
+            dialog = MyDialog("已保存录像文件\n" + self.current_video_name, window)
+            dialog.exec_()
+            # 显示窗口并进入主循环
+            window.show()
             self.button3.show()
-
+            self.folder_button1.show()
+            self.space_label.hide()
 
     def write_video(self):
         frame = cv2.cvtColor(FRAME, cv2.COLOR_BGR2RGB)
         self.out.write(frame)
 
+    imgs_out_folder = "./imgs/frames/FRAME-"
+
+    def save_image(self):
+
+        now = datetime.now()
+        current_time = now.strftime("%Y-%m-%d-%H-%M-%S-%f")[:-4]
+        str = self.imgs_out_folder + current_time + ".jpg"
+        print("存储了一张照片 " + str)
+        cv2.imwrite(str, FRAME)
+        window = QWidget()
+        window.setWindowTitle('全景拼接播放系统 v2.2.7')
+        window.resize(300, 200)
+        widget_icon = QIcon('./imgs/icons8-web-camera-48.png')
+        window.setWindowIcon(widget_icon)
+        # 创建一个自定义 QDialog 对象并执行该对话框
+        dialog = MyDialog("已保存当前帧", window)
+        dialog.exec_()
+        # 显示窗口并进入主循环
+        window.show()
+
     def show_video(self):
         print("显示视频：")
         print(self.current_video_name)
-        capppp = cv2.VideoCapture(self.output_path + self.current_video_name)
-        self.pause_image()
+        cap_ppp = cv2.VideoCapture(self.output_path + self.current_video_name)
+        do = False
+        if not self.paused:
+            self.pause_image()
+            do = True
         while True:
-            ret, frame = capppp.read()
+            ret, frame = cap_ppp.read()
             if not ret:
                 break
             cv2.imshow('frame', frame)
@@ -438,30 +652,93 @@ class VideoDisplay(QWidget):
                 break
             time.sleep(0.08)
 
-        capppp.release()
-        self.pause_image()
+        cap_ppp.release()
+        if do:
+            self.pause_image()
         cv2.destroyAllWindows()
 
     def pause_image(self):
         self.paused = not self.paused
-        self.button1.setText('继续播放▷' if self.paused else '暂停播放‖')
+        self.button1.setText('继续播放▷' if self.paused else '暂停播放')
 
     def set_status(self):
         # 设置布尔变量的状态
         for i in range(5):
-            self.status[i] = CAMERA_STATUS[i]  # 这里只是一个示例，你需要根据具体需求修改实现方式
+            self.status[i] = CAMERA_STATUS[i]  #
 
         # 更新布尔变量的值到 QLabel 组件上
         for i, status_label in enumerate(self.status_labels):
             state_str = '正常' if self.status[i] else '失去信号'  # 利用三目运算符将 True/False 转化为 中文‘真’/‘假’
             status_str = f"相机 {i + 1} 状态: {state_str}"
             status_label.setText(status_str)
+
             # if self.status[i]:
             #     # True状态为绿色
             #     status_icon.setStyleSheet('background-color: green; border-radius: 5px;')
             # else:
             #     # False状态为红色
             #     status_icon.setStyleSheet('background-color: red; border-radius: 5px;')
+
+    def open_folder(self, path):
+        subprocess.Popen(f"explorer {path}")
+
+
+class MyDialog(QDialog):
+    def __init__(self, message, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("提示")
+        self.setFixedHeight(140)
+        # 创建一个垂直布局并将其设置为 QDialog 的主要布局
+        layout = QVBoxLayout(self)
+
+        # 创建一个 QLabel 并将其添加到垂直布局中
+        label = QLabel(message, self)
+        label.setFixedWidth(200)
+        label.setFixedHeight(50)
+        label.setAlignment(Qt.AlignCenter)
+        font = QFont('宋体', 12)  # 创建一个字体对象
+        label.setFont(font)
+        layout.addWidget(label)
+        layout.addStretch(1)
+        # 创建一个 QPushButton 并将其添加到垂直布局中
+        button = QPushButton('确定', self)
+        button.setFixedWidth(50)
+        # button.setAlignment(Qt.AlignCenter)
+        button.clicked.connect(self.accept)
+        layout.addWidget(button, 0, Qt.AlignCenter)
+
+
+class MyButton(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        # 初始化按钮
+        self.button = QPushButton("按钮")
+        font = QFont('MicroSoft YaHei', 14)
+        font.setBold(True)
+        self.button.setFont(font)
+        self.button.setFixedSize(200, 40)
+
+        # 设置样式
+        self.button.setFlat(True)
+        self.button.setStyleSheet("""
+            QPushButton {
+                background-color: rgb(255, 165, 0);
+                color: white;
+                border-radius: 10px;
+                border-width: 1px;
+                border-color: black;
+                padding: 8px;
+                }
+            QPushButton:hover {
+                background-color: rgb(255, 140, 0);
+                }
+            """)
+
+        # 添加到父部件
+        layout = QHBoxLayout()
+        layout.addWidget(self.button)
+        self.setLayout(layout)
 
 
 if __name__ == '__main__':

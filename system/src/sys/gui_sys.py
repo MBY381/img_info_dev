@@ -1,16 +1,12 @@
-import asyncio
-import json
 import time
-import re
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
 
-import sys
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QApplication
+from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget
 
 # 导入python-opencv和numpy模块
 import cv2
@@ -243,7 +239,7 @@ cond = threading.Condition()
 # 定义一个 Barrier，用于同步线程开始的时间
 barrier = threading.Barrier(5)
 
-imgs = [0,0,0,0,0]
+imgs = [0, 0, 0, 0, 0]
 
 
 def readd():
@@ -302,35 +298,6 @@ def run_threads():
         t = threading.Thread(target=run_func, args=(func, i))
         t.start()
         threads.append(t)
-    # 创建一个同步屏障对象，用于同步多个线程的执行
-    # barrier = threading.Barrier(len(functions))
-    #
-    # # 创建并启动每个线程
-    # threads = []
-    # t1 = threading.Thread(target=run_thread, args=(functions[0], barrier, 0))
-    # t1.start()
-    # threads.append(t1)
-    # t2 = threading.Thread(target=run_thread, args=(functions[1], barrier, 1))
-    # t2.start()
-    # threads.append(t2)
-    # t3 = threading.Thread(target=run_thread, args=(functions[2], barrier, 2))
-    # t3.start()
-    # threads.append(t3)
-    # t4 = threading.Thread(target=run_thread, args=(functions[3], barrier, 3))
-    # t4.start()
-    # threads.append(t4)
-    # t5 = threading.Thread(target=run_thread, args=(functions[4], barrier, 4))
-    # t5.start()
-    # threads.append(t5)
-
-    # print("?????")
-    # for func in functions:
-    #     t = threading.Thread(target=run_thread, args=(func, barrier))
-    #     t.start()
-    #     threads.append(t)
-    # app = QApplication(sys.argv)
-    # display = VideoDisplay()
-    # display.show()
 
     # 主线程等待所有子线程结束
     for t in threads:

@@ -1,12 +1,9 @@
-import sys
-import cv2
+from system.src.sys.src_back import system
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QWidget, QApplication
 
-import json
 import time
-import re
 
 # 导入python-opencv和numpy模块
 import cv2
